@@ -11,8 +11,7 @@ pygame.time.set_timer(cst.PASSESECONDE, 1000)
 game = Game()
 
 while running :
-    cst.screen.fill((50,50,50))
-    game.boucle()
+    cst.screen.fill((120,120,120))
     game.afficher(cst.screen)
     for event in pygame.event.get():
         game.event(event)

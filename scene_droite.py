@@ -2,6 +2,7 @@ import pygame
 import string
 import utilitaire.constante as cst
 import utilitaire.fonction_utile as fct
+from utilitaire.eventhandler import eventhandler
 
 class SceneDroite:
 
@@ -9,15 +10,16 @@ class SceneDroite:
         self.timer_on = True
         self.timer = {"blanc":cst.timer_blanc,"noir":cst.timer_noir}
         self.timer_minute = {"blanc":"","noir":""}
-        self.coup_joue = []
+        self.coup_joue = {"blanc":[],"noir":[]}
         # self.piece_blanc_manger = AffichagePionManger('blanc')
         # self.piece_noir_manger = AffichagePionManger('noir')
-        self.all_texte = []
-        self.texte_timer = {"blanc":fct.TexteAfficher(cst.PETITEPOLICE,"",(cst.height+((1/8)*(cst.width-cst.height)),cst.height/8)),
-                            "noir":fct.TexteAfficher(cst.PETITEPOLICE,"",(cst.height+((5/8)*(cst.width-cst.height)),cst.height/8))}
-        print(cst.height+((1/8)*(cst.width-cst.height)))
-        print(cst.height+((5/8)*(cst.width-cst.height)))
+        self.texte_timer = {"blanc":fct.TexteAfficher(None,"timer_blanc",cst.PETITEPOLICE,"",(cst.height+(0.1*(cst.width-cst.height)),cst.height/8),color='white',active=True),
+                            "noir":fct.TexteAfficher(None,"timer_noir",cst.PETITEPOLICE,"",(cst.height+(0.6*(cst.width-cst.height)),cst.height/8),active=True)}
+
         self.echiquier = echiquier
+        self.afficher_coup = {"blanc":fct.TexteDeroulant(None,'noir',(0.05*(cst.width-cst.height)+cst.height,cst.height/4),0.4*(cst.width-cst.height),cst.height*0.35,active=True),
+                              "noir":fct.TexteDeroulant(None,'blanc',(0.55*(cst.width-cst.height)+cst.height,cst.height/4),0.4*(cst.width-cst.height),cst.height*0.35,active=True)}
+        eventhandler.ajouter_event(cst.EVENTPASSESECOND,self.temp_timer_reduction)
 
         self.init_affichage()
 
@@ -38,67 +40,37 @@ class SceneDroite:
 
     def update_affichage(self,couleur):
         self.texte_timer[couleur].changer_texte(self.timer_minute[couleur])
+
     def afficher(self,surface):
         for texte in self.texte_timer.values():
             texte.afficher(surface)
-        # self.piece_noir_manger.update()
-        # self.piece_blanc_manger.update()
-        # self.afficher_coup_texte()
+        for elem in self.afficher_coup.values():
+            elem.afficher(surface)
 
-    def cree_texte(self,couleur):
-        if couleur == 'blanc' :
-            coup = self.coup_joue_blanc[-1]
+    def ajouter_coup(self,coup):
+        self.coup_joue[coup[5]].append(coup)
+        if coup[6] is None :
+            texte = fct.TexteAfficher(None,"",cst.TRESPETITEPOLICE, self.creer_texte(coup), (0, 0), color='white',active=True)
         else :
-            coup = self.coup_joue_noir[-1]
-        texte = Texte(self.screen,coup,couleur)
-        for elem in self.all_texte :
-            if elem.couleur == couleur:
-                elem.changer_position()
-        self.all_texte.append(texte)
+            texte = fct.TexteAfficher(None,"",cst.TRESPETITEPOLICE, coup[6], (0, 0), color='white')
+        self.afficher_coup[coup[5]].add_child(texte,en_bas=True)
 
-    def afficher_coup_texte(self):
-        for elem in self.all_texte:
-            if elem.pos_actuel < 12 :
-                self.screen.blit(elem.texte_affichable[0],elem.texte_affichable[1])
+    def creer_texte(self,coup):
+        alphabet = string.ascii_lowercase
+        dic_Piece_anglais = {'p' : 'P','d' : 'Q','t' : 'R','r' : 'K','f' : 'B','c': 'C'}
+        case = alphabet[coup[0][0]] + str(coup[0][1]+1)
+        case_arriver = alphabet[coup[2][0]] + str(coup[2][1]+1)
+        texte = dic_Piece_anglais[coup[1][0]] + case + ' ' + case_arriver
+        print(coup[3])
+        if coup[3] is not None:
+            texte += 'x' + dic_Piece_anglais[coup[3][0]]
+        return texte
 
     def init_affichage(self):
         self.update_text("blanc")
         self.update_text("noir")
         self.update_affichage("blanc")
         self.update_affichage("noir")
-
-
-class Texte:
-    def __init__(self,coup_jouer_ecrit,couleur):
-        self.screen = screen
-        self.screen_height = screen.get_height()
-        self.origine = (self.screen_height, 0)
-        self.width = self.screen.get_width() - self.screen_height
-        self.pos_actuel = 0
-        self.font = pygame.font.Font('pieces_echecs/gau_font_cube/GAU_cube_B.TTF', self.width//25)
-        self.y = (self.pos_actuel+5) * self.screen_height / 25
-        self.couleur = couleur
-        if couleur == 'blanc' :
-            self.x = self.screen_height + self.width/8
-        else:
-            self.x = self.screen_height + 5 * self.width / 8
-        self.texte = self.creer_texte(coup_jouer_ecrit)
-        self.texte_affichable = (self.font.render(self.texte, True, (255, 255, 255)), (self.x ,self.y))
-
-    def creer_texte(self,coup):
-        alphabet = string.ascii_lowercase
-        texte = ''
-        dic_Piece_anglais = {'p' : '','d' : 'Q','t' : 'R','r' : 'K','f' : 'B','c': 'C'}
-        case = alphabet[coup[1][0]] + str(coup[1][1]+1)
-        texte += dic_Piece_anglais[coup[0]] + case
-        if len(coup) == 3:
-            texte += 'x' + dic_Piece_anglais[coup[2]]
-        return texte
-
-    def changer_position(self):
-        self.pos_actuel += 1
-        self.y = (self.pos_actuel+5) * self.screen_height / 25
-        self.texte_affichable = (self.font.render(self.texte, True, (255, 255, 255)), (self.x ,self.y) )
 
 
 

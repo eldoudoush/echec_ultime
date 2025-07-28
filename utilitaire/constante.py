@@ -37,6 +37,10 @@ EVENTPASSESECOND = 7
 EVENT250MS = 8 # pas utiliser
 EVENTMOUSECLICK = 9
 EVENTMOUSEMOTION = 10
+EVENTSCROLLUP = 11
+EVENTSCROLLDOWN = 12
+EVENTMOUSEFINCLICK = 13
+EVENTMAT = 14
 
 #plateau
 plateau_classique = 'RCBQKBCR/PPPPPPPP/8/8/8/8/pppppppp/rcbqkbcr'
@@ -46,6 +50,7 @@ timer_blanc = 30*60
 timer_noir = 30*60
 
 #taille chose
+TRESPETITEPOLICE = int(width / 48)
 PETITEPOLICE = int(width / 32)
 MOYENNEPOLICE = int(width / 20)
 GRANDEPOLICE = int(width/14)

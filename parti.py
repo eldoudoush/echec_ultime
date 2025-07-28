@@ -1,13 +1,17 @@
+from time import sleep
+
 from echiquier import Echiquier
 import utilitaire.constante as cst
 import utilitaire.fonction_utile as fct
 import pygame
+from utilitaire.eventhandler import eventhandler
+from utilitaire.fonction_utile import autre_couleur, AffichageBouttonTexteImage
 
-from utilitaire.fonction_utile import autre_couleur
 
-
-# un coup est : [coordone de la piece bouger , piece bouger , coordone d'arriver ,
-#               piece manger si une piece est manger sinon None, met_echec:bool,couleur de la piece bouger]
+# un coup est : [0 coordone de la piece bouger ,1 piece bouger ,2 coordone d'arriver ,
+#               3 piece manger si une piece est manger sinon None,4 met_echec:bool,5 couleur de la piece bouger
+#               6 rock : None si pas rock sinon lower pour blanc et g pour gauche les inverse pour le reste
+#               7 ep,8 promote]
 
 class Parti:
     def __init__(self):
@@ -16,21 +20,26 @@ class Parti:
         self.parti_en_cour = True
         self.preview = []
         self.piece_mort = {"blanc":[],"noir":[]}
-        self.joueur_gagnant = None
+        self.joueur_gagnant = " error "
         self.coup_jouer = []
+        eventhandler.ajouter_event(cst.EVENTMOUSECLICK,self.click)
+        eventhandler.ajouter_event(cst.EVENTMAT,self.gerer_mat)
+        self.ecran_fin = AffichageBouttonTexteImage("ecran_fin",pygame.rect.Rect(0,0,cst.width,cst.height),active=False)
+        self.ecran_fin.add_boutton("retour_menu",(0.25,0.575),(0.5,0.25),texte='retour au menu',color=cst.COULEURBOUTONACCEUIL,color_hover=cst.COULEURBOUTONACCEUILHOVER,reponse=cst.EVENTRETOURAUMENUSOLO,pourcentage=True)
+        self.mat = False
 
     def afficher(self,surface):
         if not self.parti_en_cour :
             return
         self.echiquier.afficher_case()
-
         for image in self.preview :
             image.afficher(surface)
 
         self.echiquier.afficher_piece(surface)
+        self.ecran_fin.afficher(surface)
 
     def click(self):
-        if not self.parti_en_cour:
+        if not self.parti_en_cour or self.mat:
             return
         x,y = pygame.mouse.get_pos()
         x = int( x // cst.taille_case)
@@ -47,33 +56,10 @@ class Parti:
         else:
             self.changer_piece_selectione(None)
 
-    def tour_suivant(self):
-        if self.echiquier.roi_noir.roi_en_echec :
-            self.echiquier.roi_noir.actualiser_image()
-            self.echiquier.roi_noir.roi_en_echec = False
-        elif self.echiquier.roi_blanc.roi_en_echec :
-            self.echiquier.roi_blanc.actualiser_image()
-            self.echiquier.roi_blanc.roi_en_echec = False
-
-        if self.echiquier.couleur_joueur == 'blanc' :
-            coup = piece.calcul_coup_noir(self.echiquier)
-            coup_ennemi = piece.calcul_coup_blanc(self.echiquier,calcul=False)
-            self.couleur_joueur = 'noir'
-            if len(coup) == 0:
-                self.parti_en_cour = False
-                self.joueur_gagnant = 'blanc'
-            elif self.echiquier.roi_noir.coordone in coup_ennemi :
-                self.echiquier.roi_noir.roi_echec()
-
-        else :
-            coup = piece.calcul_coup_blanc(self.echiquier)
-            coup_ennemi = piece.calcul_coup_noir(self.echiquier, calcul=False)
-            self.couleur_joueur = 'blanc'
-            if len(coup) == 0:
-                self.parti_en_cour = False
-                self.joueur_gagnant = 'blanc'
-            elif self.echiquier.roi_noir.coordone in coup_ennemi:
-                self.echiquier.roi_noir.roi_echec()
+    def gerer_mat(self):
+        self.mat = True
+        self.ecran_fin.add_texte("texte_gagnant",cst.MOYENNEPOLICE,"le joueur "+self.joueur_gagnant+" a gagner",(0.5,0.3),color="red",iscentre=True,pourcentage=True)
+        self.ecran_fin.activer_desactiver(mettre=True)
 
     def changer_piece_selectione(self,piece):
         self.preview.clear()
@@ -89,11 +75,11 @@ class Parti:
         for elem in self.piece_selectione.coup :
             x,y = elem
             if self.echiquier.echiquier[x][y] is None :
-                self.preview.append(fct.Image(pygame.Rect(tc*x,tc*y,tc,tc),"image/point/point_grisv2.png"))
+                self.preview.append(fct.Image(None,"gris",pygame.Rect(tc*x,tc*y,tc,tc),"image/point/point_grisv2.png"))
             else:
-                self.preview.append(fct.Image(pygame.Rect(tc*x,tc*y,tc,tc),"image/point/point_rougev2.png"))
+                self.preview.append(fct.Image(None,"rouge",pygame.Rect(tc*x,tc*y,tc,tc),"image/point/point_rougev2.png"))
         x,y = self.piece_selectione.coordone
-        self.preview.append(fct.Image(pygame.Rect(tc*x,tc*y,tc,tc),"image/point/selectione.png"))
+        self.preview.append(fct.Image(None,"selectione",pygame.Rect(tc*x,tc*y,tc,tc),"image/point/selectione.png"))
 
     def jouer_coup(self,piece,destination):
         x,y = destination
@@ -110,14 +96,7 @@ class Parti:
         if not destination is None :
             self.piece_prise(destination)
 
-        if piece.piece == 'pion' :
-            if abs(x - i) == 1 :
-                if j-1 >=0 and not self.echiquier.echiquier[i][j-1] is None and self.echiquier.echiquier[i][j-1] in self.echiquier.show_ep() :
-                    self.piece_prise(self.echiquier.echiquier[i][j - 1])
-                    self.echiquier.echiquier[i][j - 1] = None
-                elif j+1 >=7 and not self.echiquier.echiquier[i][j+1] is None and self.echiquier.echiquier[i][j+1] in self.echiquier.show_ep() :
-                    self.piece_prise(self.echiquier.echiquier[i][j+1])
-                    self.echiquier.echiquier[i][j + 1] = None
+
         self.echiquier.ep.clear()
         if piece.piece == 'pion' and abs(piece.coordone[1] - j) == 2 :
             self.echiquier.ep.append(piece)
@@ -142,9 +121,6 @@ class Parti:
             self.echiquier.piece_blanc.remove(piece)
         else:
             self.echiquier.piece_noir.remove(piece)
-
-    def boucle(self):
-        self.echiquier.boucle()
 
 class PartiLocal(Parti):
     def __init__(self):

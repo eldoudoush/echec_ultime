@@ -3,8 +3,9 @@ import pygame
 class EventHandler:
     def __init__(self):
         self.lst = []
+        self.init_lst()
 
-    def init_dic(self):
+    def init_lst(self):
         for i in range(20):
             self.lst.append([])
 
@@ -16,7 +17,12 @@ class EventHandler:
             if callable(elem):
                 elem()
 
+    def enlever_event(self,event,func):
+        if func in self.lst[event] :
+            self.lst[event].remove(func)
+            print("success")
+
     def ajouter_event(self,event,func):
-        self.dic[event].append(func)
+        self.lst[event].append(func)
 
 eventhandler = EventHandler()

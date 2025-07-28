@@ -14,6 +14,8 @@ class Game:
         self.menu_solo = acceuil.menu_solo
         self.acceuil = acceuil.accueil
         self.parametre = Parametre()
+        self.acceuil.activer_desactiver(True)
+        self.check_event()
 
     def afficher(self,surface):
         if self.etat == cst.ACCEUIL:
@@ -28,57 +30,48 @@ class Game:
     def event(self,event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             eventhandler.activer_event(cst.EVENTMOUSECLICK)
+        if event.type == pygame.MOUSEBUTTONUP:
+            eventhandler.activer_event(cst.EVENTMOUSEFINCLICK)
         if event.type == pygame.MOUSEMOTION:
             eventhandler.activer_event(cst.EVENTMOUSEMOTION)
         if event.type == cst.PASSESECONDE :
             eventhandler.activer_event(cst.EVENTPASSESECOND)
+        if event.type == pygame.MOUSEWHEEL :
+            if event.y == 1:
+                eventhandler.activer_event(cst.EVENTSCROLLUP)
+            else :
+                eventhandler.activer_event(cst.EVENTSCROLLDOWN)
 
 
     def aller_au_menu_solo(self):
         self.etat = cst.MENUSOLO
         self.solo = True
+        self.acceuil.activer_desactiver(False)
+        self.menu_solo.activer_desactiver(True)
+        self.parametre.icon_boutton.activer_desactiver(True)
 
     def aller_a_acceuil(self):
         self.etat = cst.ACCEUIL
         self.solo = False
+        self.acceuil.activer_desactiver(True)
+        self.menu_solo.activer_desactiver(False)
+        self.parametre.icon_boutton.activer_desactiver(False)
 
     def init_partie_solo(self):
+        print('ez')
         self.parti = PartiLocal()
         self.etat = cst.PARTI
-        self.parametre.en_parti = True
+        self.menu_solo.activer_desactiver(False)
 
     def fin_parti(self):
-        del self.parti
+        eventhandler.enlever_event(cst.EVENTMOUSECLICK,self.parti.ecran_fin.children['retour_menu'].est_clique)
         self.parti = None
-        self.parametre.en_parti = False
         self.etat = cst.MENUSOLO
+        self.menu_solo.activer_desactiver(True)
 
     def check_event(self):
-        eventhandler.activer_event(cst.EVENTLANCER1V1,self.init_partie_solo)
-        eventhandler.activer_event(cst.EVENTRETOURAUMENUSOLO, self.fin_parti)
-        eventhandler.activer_event(cst.EVENTLANCER1V1, self.init_partie_solo)
-        eventhandler.activer_event(cst.EVENTLANCER1V1, self.init_partie_solo)
-        # if fct.check_event(cst.LANCER1V1) :
-        #     self.init_partie_solo()
-        # if fct.check_event(cst.RETOURAUMENUSOLO):
-        #     self.fin_parti(cst.MENUSOLO)
-        #     self.parametre.est_afficher = False
-        # if fct.check_event(cst.ALLERAUMENUSOLO):
-        #     self.aller_au_menu_solo()
-        # if fct.check_event(cst.ALLERAACCEUIL):
-        #     self.aller_a_acceuil()
+        eventhandler.ajouter_event(cst.EVENTLANCER1V1,self.init_partie_solo)
+        eventhandler.ajouter_event(cst.EVENTRETOURAUMENUSOLO, self.fin_parti)
+        eventhandler.ajouter_event(cst.EVENTALLERAUMENUSOLO, self.aller_au_menu_solo)
+        eventhandler.ajouter_event(cst.EVENTALLERAACCEUIL, self.aller_a_acceuil)
 
-    def boucle(self):
-        self.check_event()
-        if cst.mouseclick and self.parti is not None:
-            self.parti.click()
-        elif self.etat == cst.ACCEUIL :
-            self.acceuil.boucle(cst.mouseclick,cst.mousemotion)
-        elif self.etat == cst.MENUSOLO:
-            self.menu_solo.boucle(cst.mouseclick,cst.mousemotion)
-        elif self.etat == cst.PARTI :
-            self.parti.boucle()
-        if self.solo :
-            self.parametre.boucle(cst.mouseclick,cst.mousemotion)
-        cst.mousemotion = False
-        cst.mouseclick = False

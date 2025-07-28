@@ -2,8 +2,11 @@ import piece
 import utilitaire.constante as cst
 import pygame
 import utilitaire.fonction_utile as fct
+from piece import Reine
 from scene_droite import SceneDroite
+from utilitaire.eventhandler import eventhandler
 from utilitaire.fonction_utile import autre_couleur
+
 
 
 class Echiquier:
@@ -16,6 +19,7 @@ class Echiquier:
         self.dic_lettre_piece = {'p':piece.Pion,'c':piece.Cheval,'b':piece.Fou,'r':piece.Tour,'q':piece.Reine,'k':piece.Roi}
         self.init_echiquier(cst.plateau_classique)
         self.coup_couleur = {"blanc":[],"noir":[]}
+        self.coup = []
         self.scene_droite = SceneDroite(self)
         self.parti = parti
 
@@ -69,46 +73,96 @@ class Echiquier:
         else:
             return cla(ind % 8, ind // 8, 'noir', self)
 
-    def calcul_coup(self, couleur, roi_mouv=True, calcul=True, en_passant=True) -> None or list[
+    def calcul_all_coup(self, couleur, roi_mouv=True, calcul=True, en_passant=True) -> None or list[
         tuple[int]]:
         l = []
         for elem in self.piece_dic[couleur]:
             if elem.piece == 'pion' and elem.peut_jouer:
                 elem.calcul_coup(calcul=calcul, detect_enpassent=en_passant)
-            if elem.piece != 'roi' and elem.peut_jouer:
+            elif elem.piece != 'roi' and elem.peut_jouer:
                 elem.calcul_coup(calcul=calcul)
-                l += elem.coup
             elif elem.piece == 'roi' and roi_mouv and elem.peut_jouer:
                 elem.calcul_coup(calcul=calcul)
-                l += elem.coup
-        if calcul:
+            l += elem.coup
+        if calcul and couleur == self.couleur_joueur:
             self.coup_couleur[couleur] += l
         return l
 
     def preparer_couleur_joue(self,couleur):
+        for lst in self.coup_couleur.values():
+            lst.clear()
+        for lst in self.piece_dic.values():
+            lst.clear()
         self.mettre_piece_dans_liste()
         self.roi[fct.autre_couleur(couleur)].enlever_echec()
-        mat = False
-        self.calcul_coup(couleur)
+        self.calcul_all_coup(couleur)
         if len(self.coup_couleur[couleur]) == 0:
-            mat = True
-        return mat
+            self.parti.joueur_gagnant = autre_couleur(self.couleur_joueur)
+            print(self.parti.joueur_gagnant)
+            eventhandler.activer_event(cst.EVENTMAT)
 
     def creer_coup(self,piec,destination):
-        i,j = destination
+        rock = None
+        ep = False
+        promote = False
+        if piec.piece == "pion":
+            promote = destination[1] == 0 or destination[1] == 7
+            debut, met_echec, piece_manger,ep = self.check_ep(piec,destination)
+        if piec.piece == "roi" and abs(piec.coordone[0]-destination[0]) == 2:
+            debut, met_echec, piece_manger,rock = self.coup_met_en_echec_rock(piec,destination)
+        elif not ep :
+            debut, met_echec, piece_manger = self.coup_met_en_echec(piec,destination)
+        return (debut,piec.piece,destination,piece_manger,met_echec,piec.couleur,rock,ep,promote)
+
+    def coup_met_en_echec(self,piec,destination):
+        i, j = destination
         debut = piec.coordone
         piece_manger = self.echiquier[i][j]
         met_echec = False
-        self.deplacer_piece(piec,destination)
+        self.deplacer_piece(piec, destination)
         piec.calcul_coup(calcul=False)
         if self.roi[autre_couleur(piec.couleur)].coordone in piec.coup:
             met_echec = True
+        self.deplacer_piece(piec, debut)
+
         if piece_manger is not None:
             self.echiquier[i][j] = piece_manger
             piece_manger = piece_manger.piece
-        self.deplacer_piece(piec, debut)
-        return (debut,piec.piece,destination,piece_manger,met_echec,piec.couleur)
 
+        return debut,met_echec,piece_manger
+
+
+    def check_ep(self,piec,destination):
+        x,y = piec.coordone
+        i,j = destination
+        piece_manger = None
+        if piec.piece == 'pion' :
+            if abs(x - i) == 1 :
+                if j-1 >=0 and not self.echiquier[i][j-1] is None and self.echiquier[i][j-1] in self.show_ep() :
+                    piece_manger = self.echiquier[i][j - 1]
+                elif j+1 <=7 and not self.echiquier[i][j+1] is None and self.echiquier[i][j+1] in self.show_ep() :
+                    piece_manger = (self.echiquier[i][j+1])
+        ep = piece_manger is not None
+        if ep :
+            piece_manger = piece_manger.piece
+        debut,met_echec,_ = self.coup_met_en_echec(piec,destination)
+        return debut,met_echec,piece_manger,ep
+
+    def coup_met_en_echec_rock(self,piec,destination):
+        i, j = destination
+        rock = "rd" if i > piec.coordone[0] else 'rg'
+        debut = 0 if rock == "rg" else 7
+        if piec.coordone[1] == 0:
+            rock = rock.upper()
+        piece_deplacer = self.echiquier[debut][piec.coordone[1]]
+        debut = piece_deplacer.coordone
+        met_echec = False
+        self.deplacer_piece(piece_deplacer, destination)
+        piece_deplacer.calcul_coup(calcul=False)
+        if self.roi[autre_couleur(piece_deplacer.couleur)].coordone in piece_deplacer.coup:
+            met_echec = True
+        self.deplacer_piece(piece_deplacer, debut)
+        return debut,met_echec,None,rock
 
     def deplacer_piece(self,piec,destination,vraiment=False):
         x,y = piec.coordone
@@ -119,20 +173,33 @@ class Echiquier:
         if vraiment:
             piec.premier_coup = False
 
+    def jouer_rock(self,rock:str,vraiment=False):
+        y = 7 if rock.islower() else 0
+        x = 7 if rock[1].lower() == 'd' else 0
+        i1 = 5 if x == 7 else 3
+        i2 = 6 if x == 7 else 2
+        self.deplacer_piece(self.echiquier[x][y],(i1,y),vraiment)
+        self.deplacer_piece(self.echiquier[4][y], (i2, y), vraiment)
 
-
-    def jouer_coup(self,coup):
-        co_piece_bouger, piece_bouger, destination ,piece_manger,met_echec,couleur = coup
-        x,y = co_piece_bouger
-        piec = self.echiquier[x][y]
-        i,j = destination
-        self.echiquier[i][j] = piec
-        self.deplacer_piece(piec,destination,True)
+    def jouer_coup(self,coup,vraiment=True):
+        self.ep.clear()
+        co_piece_bouger, piece_bouger, destination ,piece_manger,met_echec,couleur,rock,ep,promote = coup
+        if rock is None :
+            x,y = co_piece_bouger
+            piec = self.echiquier[x][y]
+            self.deplacer_piece(piec,destination,True)
+        else:
+            self.jouer_rock(rock,vraiment)
+        if piece_bouger == "pion" and abs(co_piece_bouger[1] - destination[1]) == 2 :
+            self.ep.append(self.echiquier[destination[0]][destination[1]])
+        if ep :
+            self.echiquier[destination[0]][co_piece_bouger[1]] = None
+        if promote :
+            i,j = destination
+            self.echiquier[i][j] = Reine(i,j,couleur,self)
         if met_echec:
             self.roi[autre_couleur(couleur)].roi_echec()
-
-    def boucle(self):
-        if fct.check_event(cst.PASSESECOND):
-            self.scene_droite.temp_timer_reduction()
-
+        if vraiment :
+            self.scene_droite.ajouter_coup(coup)
+            self.coup.append(coup)
 
