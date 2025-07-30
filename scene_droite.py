@@ -6,7 +6,7 @@ from utilitaire.eventhandler import eventhandler
 
 class SceneDroite:
 
-    def __init__(self,echiquier):
+    def __init__(self,echiquier,rewind=False):
         self.timer_on = True
         self.timer = {"blanc":cst.timer_blanc,"noir":cst.timer_noir}
         self.timer_minute = {"blanc":"","noir":""}
@@ -20,7 +20,14 @@ class SceneDroite:
         self.afficher_coup = {"blanc":fct.TexteDeroulant(None,'noir',(0.05*(cst.width-cst.height)+cst.height,cst.height/4),0.4*(cst.width-cst.height),cst.height*0.35,active=True),
                               "noir":fct.TexteDeroulant(None,'blanc',(0.55*(cst.width-cst.height)+cst.height,cst.height/4),0.4*(cst.width-cst.height),cst.height*0.35,active=True)}
         eventhandler.ajouter_event(cst.EVENTPASSESECOND,self.temp_timer_reduction)
-
+        if rewind :
+            self.ind = 0
+            self.bouton_retour = fct.Boutton(None,"bouton",(0.15*(cst.width-cst.height)+cst.height,cst.height*3/4),(0.2*(cst.width-cst.height),cst.height*0.15),texte='<',color=cst.COULEURBOUTONACCEUIL,color_hover=cst.COULEURBOUTONACCEUILHOVER,reponse=(self.changer_ind,-1),active=True)
+            self.bouton_retour = fct.Boutton(None, "bouton",
+                                             (0.65 * (cst.width - cst.height) + cst.height, cst.height * 3 / 4),
+                                             (0.2 * (cst.width - cst.height), cst.height * 0.15), texte='>',
+                                             color=cst.COULEURBOUTONACCEUIL, color_hover=cst.COULEURBOUTONACCEUILHOVER,
+                                             reponse=(self.changer_ind, 1), active=True)
         self.init_affichage()
 
     def temp_timer_reduction(self):
@@ -38,6 +45,16 @@ class SceneDroite:
         self.timer_minute[couleur] = str(self.timer[couleur] // 60) + ':' + (
             '0' if self.timer[couleur] % 60 < 10 else '') + str(self.timer[couleur] % 60)
 
+    def changer_ind(self,changer:int):
+        if self.ind + changer == len(self.echiquier.coup) or self.ind + changer == 0 :
+            return
+        if changer == -1:
+            self.echiquier.dejouer_coup(self.echiquier.coup[self.ind])
+        if changer == 1 :
+            self.echiquier.jouer_coup(self.echiquier.coup[self.ind+1])
+        self.ind += changer
+
+
     def update_affichage(self,couleur):
         self.texte_timer[couleur].changer_texte(self.timer_minute[couleur])
 
@@ -52,7 +69,7 @@ class SceneDroite:
         if coup[6] is None :
             texte = fct.TexteAfficher(None,"",cst.TRESPETITEPOLICE, self.creer_texte(coup), (0, 0), color='white',active=True)
         else :
-            texte = fct.TexteAfficher(None,"",cst.TRESPETITEPOLICE, coup[6], (0, 0), color='white')
+            texte = fct.TexteAfficher(None,"",cst.TRESPETITEPOLICE, coup[6], (0, 0), color='white',active=True)
         self.afficher_coup[coup[5]].add_child(texte,en_bas=True)
 
     def creer_texte(self,coup):
@@ -61,7 +78,6 @@ class SceneDroite:
         case = alphabet[coup[0][0]] + str(coup[0][1]+1)
         case_arriver = alphabet[coup[2][0]] + str(coup[2][1]+1)
         texte = dic_Piece_anglais[coup[1][0]] + case + ' ' + case_arriver
-        print(coup[3])
         if coup[3] is not None:
             texte += 'x' + dic_Piece_anglais[coup[3][0]]
         return texte

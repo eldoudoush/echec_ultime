@@ -42,19 +42,12 @@ def autre_couleur(couleur):
         return "noir"
     return "blanc"
 
-set_event = set()
-
-def check_event(event):
-    if event in set_event :
-        set_event.remove(event)
-        return True
-    return False
-
 class SurfaceMaison:
-    def __init__(self,parent,name,rect:pygame.Rect,iscentre=False,scale=(None,None),active=False):
+    def __init__(self,parent,name,rect:pygame.Rect,iscentre=False,scale=(None,None),active=False,couleur_bg=(10,10,10),changer_active_parent=True):
         self.rect = rect
         self.surface = SurfaceType(self.rect.size)
-        self.surface.fill((10, 10, 10))
+        self.couleur_bg = couleur_bg
+        self.surface.fill(couleur_bg)
         self.surface.set_colorkey((10, 10, 10))
         self.iscentre = iscentre
         self.scale = scale
@@ -62,6 +55,8 @@ class SurfaceMaison:
         self.parent = parent
         self.children = {}
         self.name = name
+        self.changer_active_parent = changer_active_parent
+        self.detect_rect = self.rect
 
         self.init()
     def activer_desactiver(self,mettre=None):
@@ -70,6 +65,8 @@ class SurfaceMaison:
         else:
             self.active = mettre
         for child in self.children.values() :
+            if not child.changer_active_parent :
+                continue
             child.activer_desactiver(self.active)
         self.update_surface()
 
@@ -78,6 +75,7 @@ class SurfaceMaison:
             surface.blit(self.surface,self.rect)
 
     def update_surface(self):
+        self.surface.fill(self.couleur_bg)
         self.update_surface_bonus()
         for surface in self.children.values():
             surface.afficher(self.surface)
@@ -90,6 +88,14 @@ class SurfaceMaison:
     def add_child(self,child):
         self.children[child.name] = child
         child.active = self.active
+        child.detect_rect = child.rect.move(self.detect_rect.topleft)
+        self.update_surface()
+
+    def changer_pos(self, pos: tuple[float, float]):
+        distance = soustraire_tuple(pos,self.rect.topleft)
+        self.rect = pygame.Rect(pos,self.rect.size)
+        pos_detect_rect = ajouter_tuple(distance,self.detect_rect.topleft)
+        self.detect_rect = pygame.Rect(pos_detect_rect,self.rect.size)
         self.update_surface()
 
     def init(self):
@@ -112,10 +118,6 @@ class Image(SurfaceMaison):
             surface.blit(self.surface, soustraire_tuple(self.rect.topleft,self.rect.center))
         else:
             surface.blit(self.surface, self.rect.topleft)
-
-    def changer_pos(self, pos: tuple[float, float]):
-        self.rect = pygame.Rect(pos,self.rect.size)
-        self.update_surface()
 
     def changer_img(self, image_path: str):
         self.image_path = image_path
@@ -149,9 +151,6 @@ class TexteAfficher(SurfaceMaison):
             return
         surface.blit(self.surface,self.rect)
 
-    def changer_pos(self,pos:tuple[int,int]):
-        self.rect = pygame.Rect(pos,self.rect.size)
-        self.update_surface()
 
     def changer_texte(self,message:str):
         self.texte = message
@@ -171,14 +170,18 @@ class TexteAfficher(SurfaceMaison):
         self.update_surface()
 
 class TexteDeroulant(SurfaceMaison):
-    def __init__(self,parent,name,pos:tuple[float,float],largeur:float,hauteur:float,ecart=10,active=False,colorbg='black'):
+    def __init__(self,parent,name,pos:tuple[float,float],largeur:float,hauteur:float,ecart=10,active=False,colorbg='black',taille_scroll=None):
         super().__init__(parent,name,pygame.Rect(pos,(largeur,hauteur)),active=active)
         self.ecart = ecart
         self.ind = 0
         self.plus_haute_surface = 0
-        self.rect_arriere_scrollbar = pygame.Rect(largeur*11/12,0,largeur/12,hauteur)
         self.scroll_speed = 30
-        self.rect_scrollbar = pygame.Rect(largeur*11/12,0,largeur/12,hauteur)
+        if taille_scroll is None :
+            self.rect_scrollbar = pygame.Rect(largeur*11/12,0,largeur/12,hauteur)
+            self.rect_arriere_scrollbar = pygame.Rect(largeur * 11 / 12, 0, largeur / 12, hauteur)
+        else:
+            self.rect_scrollbar = pygame.Rect(largeur -taille_scroll, 0, taille_scroll, hauteur)
+            self.rect_arriere_scrollbar = pygame.Rect(largeur -taille_scroll, 0, taille_scroll, hauteur)
         self.surface_reel = SurfaceType((largeur, 0))
         self.lst_surface = []
         self.drag = False
@@ -223,6 +226,8 @@ class TexteDeroulant(SurfaceMaison):
         self.surface.blit(self.surface_reel,(0,-self.ind))
         pygame.draw.rect(self.surface, (70, 70, 70), self.rect_arriere_scrollbar)
         pygame.draw.rect(self.surface, (150, 150, 150), self.rect_scrollbar)
+        if self.parent is not None :
+            self.parent.update_surface()
 
     def actualiser_scrollbar(self):
         taille_reel = self.surface_reel.get_height() if self.surface_reel.get_height() > 1 else 1
@@ -248,19 +253,20 @@ class TexteDeroulant(SurfaceMaison):
     def add_child(self,surface,en_haut=False,en_bas=False):
         # if surface.rect.width > self.rect.width - self.rect_scrollbar.width :
         #     surface.scale(sx=self.rect.width -self.rect_scrollbar.width)
+        surface.detect_rect = surface.rect.move(self.detect_rect.topleft)
         if en_haut:
             self.lst_surface.insert(0,surface)
             ind = self.ecart
             for elem in self.lst_surface:
                 height = elem.rect.height
-                elem.changer_pos((0, ind))
+                elem.changer_pos((5, ind))
                 ind += self.ecart + height
         elif en_bas:
             self.lst_surface.append(surface)
             ind = self.ecart
             for elem in self.lst_surface:
                 height = elem.rect.height
-                elem.changer_pos((0,ind))
+                elem.changer_pos((5,ind))
                 ind += self.ecart + height
         else:
             self.lst_surface.append(surface)
@@ -279,75 +285,75 @@ class TexteDeroulant(SurfaceMaison):
             if self.ind < 0 :
                 self.ind = 0
         for elem in self.lst_surface :
-            if type(elem) == Boutton :
-                elem.detect_rect = elem.rect.move((0, self.ind -ind))
+            elem.detect_rect = elem.detect_rect.move((0, ind - self.ind))
         self.update_surface(ajout=False)
 
 
-class BoiteTexte:
-    def __init__(self,screen,restriction:str,taille_limite,rect:list[int],texte_originel:str=''):
-        self.texte = texte_originel
+class BoiteTexte(SurfaceMaison):
+    def __init__(self,restriction:str,taille_limite,rect:pygame.Rect,parent = None,name = "",active=False,font_size=cst.TRESPETITEPOLICE):
+        super().__init__(parent,name,rect,active=active,couleur_bg='white')
+        self.rect_bordure = self.rect.copy()
+        self.rect_bordure.inflate_ip(-int(self.rect.height/20),-int(self.rect.height/20))
         self.restriction = restriction
         self.taille_limite = taille_limite
-        self.rect = rect
-        x,y,sx,sy = rect
-        self.font_size = int(sy*2/3)
-        self.est_clicker = False
-        self.texte_afficher,self.pos_texte = cree_texte(self.font_size,self.texte,int(x+sx/12),int(y+sy/6))
-        self.screen = screen
+        self.peut_ecrire = False
+        self.texte_afficher = TexteAfficher(self,"texte",font_size,"",(self.rect.width*0.05,self.rect.height*0.05),active=self.active)
+        self.texte = ""
 
-    def update(self):
-        pygame.draw.rect(self.screen,'white',self.rect)
-        pygame.draw.rect(self.screen, 'black', self.rect, 3)
-        self.screen.blit(self.texte_afficher,self.pos_texte)
+        eventhandler.ajouter_event(cst.EVENTKEYPRESS,self.gerer_input)
+        eventhandler.ajouter_event(cst.EVENTMOUSECLICK, self.est_clicker)
+
+    def est_clicker(self):
+        if not self.active :
+            return
+        if self.detect_rect.collidepoint(pygame.mouse.get_pos()):
+            self.peut_ecrire = not self.peut_ecrire
+        else:
+            self.peut_ecrire = False
+
+    def afficher_bar(self):
+        bar = False
+        pass
+
+    def suprimer_event(self):
+        eventhandler.enlever_event(cst.EVENTMOUSECLICK, self.est_clicker)
+        eventhandler.enlever_event(cst.EVENTKEYPRESS,self.gerer_input)
+
+    def update_surface_bonus(self):
+        pygame.draw.rect(self.surface,'white',self.rect)
+        pygame.draw.rect(self.surface, 'black', self.rect_bordure, int(self.rect.height/10))
 
     def changer_texte(self,texte):
-        self.texte = texte
-        self.texte_afficher, self.pos_texte = cree_texte(self.font_size, self.texte, self.pos_texte[0], self.pos_texte[1])
+        self.texte_afficher.changer_texte(texte)
 
-    def ajouter_texte(self,entrer:str):
-        if not entrer in self.restriction:
+    def ajouter_texte(self,lettre:str):
+        if not lettre in self.restriction:
             return
-        if len(self.texte) >= self.taille_limite:
+        if len(self.texte_afficher.texte) >= self.taille_limite:
             return
-        self.texte += entrer
-        self.texte_afficher, self.pos_texte = cree_texte(self.font_size, self.texte, self.pos_texte[0], self.pos_texte[1])
+        self.changer_texte(self.texte_afficher.texte + lettre)
+        self.update_surface()
 
     def suprimer_texte(self):
-        if self.texte == '':
+        if self.texte_afficher.texte == '':
             return
-        self.texte = self.texte[:len(self.texte) - 1]
-        self.texte_afficher, self.pos_texte = cree_texte(self.font_size, self.texte, self.pos_texte[0],
-                                                         self.pos_texte[1])
+        self.changer_texte(self.texte_afficher.texte[:len(self.texte_afficher.texte) - 1])
+        self.update_surface()
 
-class GestionnaireDeBoiteTexte:
-    def __init__(self):
-        self.liste_boitetexte = []
+    def gerer_input(self,event):
+        if not self.peut_ecrire :
+            return
+        if event.key == pygame.K_BACKSPACE:
+            self.suprimer_texte()
+        else:
+            self.ajouter_texte(event.unicode)
 
-    def append(self,boitetexte:BoiteTexte):
-        self.liste_boitetexte.append(boitetexte)
-
-    def uptdate(self):
-        for elem in self.liste_boitetexte:
-            elem.update()
-
-    def activer_boitetexte(self,pos_curseur):
-        for elem in self.liste_boitetexte:
-            elem.est_clicker = False
-            if clicker(elem.rect,pos_curseur):
-                elem.est_clicker = True
-
-    def ajouter_boitetexte(self,event):
-        for elem in self.liste_boitetexte:
-            if elem.est_clicker:
-                if event.key == pygame.K_BACKSPACE:
-                    elem.suprimer_texte()
-                else:
-                    elem.ajouter_texte(event.unicode)
+    def get_texte(self):
+        return self.texte_afficher.texte
 
 class Boutton(SurfaceMaison):
-    def __init__(self,parent,name,pos,taille,img=None,texte=None,color=(10,10,10),color_hover=None,reponse=None,class_mere=None,correction=(0,0),active=True,scale=(None,None)):
-        super().__init__(parent,name,pygame.rect.Rect(pos,taille),scale=scale)
+    def __init__(self,parent,name,pos,taille,img=None,texte=None,color=(10,10,10),color_hover=None,reponse=None,scale=(None,None),active=False):
+        super().__init__(parent,name,pygame.rect.Rect(pos,taille),scale=scale,active=active)
         self.color_info = color
         self.color_hover = color_hover
         self.color = color
@@ -360,13 +366,16 @@ class Boutton(SurfaceMaison):
         if texte is not None :
             self.add_child(texte)
         self.reponse = reponse
-        self.detect_rect = self.rect.move(correction)
         self.init_event()
 
         self.update_surface()
     def init_event(self):
         eventhandler.ajouter_event(cst.EVENTMOUSECLICK, self.est_clique)
         eventhandler.ajouter_event(cst.EVENTMOUSEMOTION, self.hover)
+
+    def suprimer_event(self):
+        eventhandler.enlever_event(cst.EVENTMOUSECLICK, self.est_clique)
+        eventhandler.enlever_event(cst.EVENTMOUSEMOTION, self.hover)
 
     def scale(self,sx=None,sy=None):
         self.scale_value = (sx,sy)
@@ -376,12 +385,33 @@ class Boutton(SurfaceMaison):
         if not self.active :
             return
         pos = pygame.mouse.get_pos()
-        if self.detect_rect.collidepoint(pos):
-            if self.reponse is not None :
-                eventhandler.activer_event(self.reponse)
-    def changer_pos(self, pos: tuple[float, float]):
-        self.rect = pygame.Rect(pos,self.rect.size)
-        self.update_surface()
+        if not self.detect_rect.collidepoint(pos):
+            return
+        if self.reponse is None or self.reponse == -1 :
+            return
+        self.interpreter_reponse(self.reponse)
+
+    def interpreter_reponse(self,reponse):
+        if type(reponse) is int :
+            eventhandler.activer_event(reponse)
+            return
+        elif type(reponse) is tuple :
+            if type(reponse[1]) is tuple :
+                lst = []
+                for elem in reponse[1]:
+                    if callable(elem) :
+                        lst.append(elem())
+                    else :
+                        lst.append(elem)
+                lst = tuple(lst)
+                reponse[0](lst)
+            else:
+                reponse[0](reponse[1])
+        elif callable(reponse) :
+            reponse()
+        elif type(self.reponse) is list :
+            for elem in reponse :
+                self.interpreter_reponse(elem)
 
     def hover(self):
         if self.color_hover is None:
@@ -405,8 +435,8 @@ class Boutton(SurfaceMaison):
             self.surface = pygame.transform.scale(self.surface, (sx, sy))
 
 class AffichageBouttonTexteImage(SurfaceMaison):
-    def __init__(self,name,rect:pygame.Rect,couleur_bg=(10,10,10),active=False,parent=None):
-        super().__init__(parent,name,rect)
+    def __init__(self,name,rect:pygame.Rect,couleur_bg=(10,10,10),active=False,parent=None,changer_active_parent=True):
+        super().__init__(parent,name,rect,active=active,couleur_bg=couleur_bg,changer_active_parent=changer_active_parent)
         self.couleur_bg = couleur_bg
         self.surface.set_colorkey((10,10,10))
 
@@ -420,16 +450,14 @@ class AffichageBouttonTexteImage(SurfaceMaison):
             sy *= self.rect.height
             pos = (x,y)
             taille = (sx,sy)
-        boutton = Boutton(self,name,pos,taille,img=img,texte=texte,color=color,color_hover=color_hover,reponse=reponse,class_mere=self,correction=self.rect.topleft,active=self.active)
-        self.add_child(boutton)
+        Boutton(self,name,pos,taille,img=img,texte=texte,color=color,color_hover=color_hover,reponse=reponse,active=self.active)
 
     def add_texte(self,name,taille_font:int,message:str,pos:tuple[float,float],color='black',font='font/gau_font_cube/GAU_cube_B.TTF',iscentre=False,pourcentage=False):
         x,y = pos
         if pourcentage :
             x *= self.rect.width
             y *= self.rect.height
-        texte = TexteAfficher(self,name,taille_font,message,(x,y),color=color,font=font,iscentre=iscentre)
-        self.add_child(texte)
+        TexteAfficher(self,name,taille_font,message,(x,y),color=color,font=font,iscentre=iscentre)
 
 
     def add_image(self,name,pos,taille,image_path,iscentre=False,pourcentage=False):
@@ -442,5 +470,19 @@ class AffichageBouttonTexteImage(SurfaceMaison):
             sy *= self.rect.height
             pos = (x,y)
             taille = (sx,sy)
-        image = Image(self,name,pygame.Rect(pos,taille),image_path,iscentre=iscentre)
-        self.add_child(image)
+        Image(self,name,pygame.Rect(pos,taille),image_path,iscentre=iscentre)
+
+    def add_boite_texte(self,name,restriction,taille_limit,rect,pourcentage=False):
+        if pourcentage :
+            x, y , sx, sy = rect
+            x *= self.rect.width
+            y *= self.rect.height
+            sx *= self.rect.width
+            sy *= self.rect.height
+            rect = pygame.Rect((x,y),(sx,sy))
+        BoiteTexte(restriction,taille_limit,rect, self, name,active=self.active)
+
+    def suprimer_all_event(self):
+        for elem in self.children.values():
+            if type(elem) is Boutton or type(elem) is BoiteTexte:
+                elem.suprimer_event()

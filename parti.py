@@ -1,5 +1,6 @@
+import json
 from time import sleep
-
+import string
 from echiquier import Echiquier
 import utilitaire.constante as cst
 import utilitaire.fonction_utile as fct
@@ -14,19 +15,23 @@ from utilitaire.fonction_utile import autre_couleur, AffichageBouttonTexteImage
 #               7 ep,8 promote]
 
 class Parti:
-    def __init__(self):
+    def __init__(self,game):
         self.echiquier = Echiquier(self)
         self.piece_selectione = None
         self.parti_en_cour = True
         self.preview = []
         self.piece_mort = {"blanc":[],"noir":[]}
         self.joueur_gagnant = " error "
-        self.coup_jouer = []
         eventhandler.ajouter_event(cst.EVENTMOUSECLICK,self.click)
         eventhandler.ajouter_event(cst.EVENTMAT,self.gerer_mat)
-        self.ecran_fin = AffichageBouttonTexteImage("ecran_fin",pygame.rect.Rect(0,0,cst.width,cst.height),active=False)
-        self.ecran_fin.add_boutton("retour_menu",(0.25,0.575),(0.5,0.25),texte='retour au menu',color=cst.COULEURBOUTONACCEUIL,color_hover=cst.COULEURBOUTONACCEUILHOVER,reponse=cst.EVENTRETOURAUMENUSOLO,pourcentage=True)
+        self.ecran_fin = AffichageBouttonTexteImage("ecran_fin",pygame.rect.Rect(0.15*cst.width,0.15*cst.height,0.7*cst.width,0.7*cst.height),active=False,couleur_bg=(50,50,50))
+        self.ecran_fin.add_boutton("retour_menu",(0.25,0.6),(0.5,0.25),texte='retour au menu',color=cst.COULEURBOUTONACCEUIL,color_hover=cst.COULEURBOUTONACCEUILHOVER,reponse=cst.EVENTRETOURAUMENUSOLO,pourcentage=True)
+        self.ecran_fin.add_texte("texte_save",cst.TRESPETITEPOLICE,"nommer la sauvgarde :",(0.5,0.25),iscentre=True,pourcentage=True)
+        self.ecran_fin.add_boite_texte("boite_texte",string.ascii_letters+string.digits+' ',16,(0.2,0.3,0.6,0.1),pourcentage=True)
+        self.ecran_fin.add_boutton("save",(0.3,0.42),(0.3,0.1),texte="sauvegarder",color=cst.COULEURBOUTONACCEUIL,color_hover=cst.COULEURBOUTONACCEUILHOVER,reponse=self.save,pourcentage=True)
         self.mat = False
+        self.is_save = False
+        self.game = game
 
     def afficher(self,surface):
         if not self.parti_en_cour :
@@ -38,6 +43,18 @@ class Parti:
         self.echiquier.afficher_piece(surface)
         self.ecran_fin.afficher(surface)
 
+    def save(self):
+        name = self.ecran_fin.children["boite_texte"].texte_afficher.texte
+        if self.is_save :
+            return
+        if name in self.game.parti_jouer :
+            return
+        self.game.parti_jouer[name] = self.echiquier.coup
+        with open('save/parti.json','w') as f:
+            json.dump(self.game.parti_jouer,f)
+        self.is_save = True
+
+
     def click(self):
         if not self.parti_en_cour or self.mat:
             return
@@ -48,7 +65,6 @@ class Parti:
             return
 
         if self.echiquier.echiquier[x][y] is not None and self.echiquier.echiquier[x][y].couleur == self.echiquier.couleur_joueur:
-            print(self.echiquier.echiquier[x][y].coup)
             self.changer_piece_selectione(self.echiquier.echiquier[x][y])
         elif not self.piece_selectione is None and (x,y) in self.piece_selectione.coup :
             self.deplacer_piece(self.piece_selectione,(x,y))
@@ -58,7 +74,8 @@ class Parti:
 
     def gerer_mat(self):
         self.mat = True
-        self.ecran_fin.add_texte("texte_gagnant",cst.MOYENNEPOLICE,"le joueur "+self.joueur_gagnant+" a gagner",(0.5,0.3),color="red",iscentre=True,pourcentage=True)
+        self.echiquier.scene_droite.timer_on = False
+        self.ecran_fin.add_texte("texte_gagnant",cst.MIDPETITEPOLICE,"le joueur "+self.joueur_gagnant+" a gagner",(0.5,0.05),color="red",iscentre=True,pourcentage=True)
         self.ecran_fin.activer_desactiver(mettre=True)
 
     def changer_piece_selectione(self,piece):
@@ -81,50 +98,9 @@ class Parti:
         x,y = self.piece_selectione.coordone
         self.preview.append(fct.Image(None,"selectione",pygame.Rect(tc*x,tc*y,tc,tc),"image/point/selectione.png"))
 
-    def jouer_coup(self,piece,destination):
-        x,y = destination
-        piece_capture = None if self.echiquier.echiquier[x][y] is None else self.echiquier.echiquier[x][y].piece
-
-        coup = (piece.coordone,piece.piece,destination,piece_capture)
-
-    def deplacer_piece(self,piece ,coordone):
-        piece.premier_coup = False
-        x,y = piece.coordone
-        i,j = coordone
-        destination = self.echiquier.echiquier[i][j]
-        self.echiquier.echiquier[x][y] = None
-        if not destination is None :
-            self.piece_prise(destination)
-
-
-        self.echiquier.ep.clear()
-        if piece.piece == 'pion' and abs(piece.coordone[1] - j) == 2 :
-            self.echiquier.ep.append(piece)
-
-        self.echiquier.echiquier[i][j] = piece
-        piece.coordone = (i,j)
-        piece.actualiser_image()
-        if piece.piece == 'pion' and piece.coordone[1] in [0,7]:
-            reine = Reine(i, j, piece.couleur,self.echiquier)
-            self.piece_prise(piece,False)
-            if piece.couleur == 'blanc':
-                self.echiquier.piece_blanc.append(reine)
-            else:
-                self.echiquier.piece_noir.append(reine)
-            self.echiquier.echiquier[i][j] = reine
-
-    def piece_prise(self,piece,mort=True):
-        if mort :
-            self.piece_mort[piece.couleur].append(piece)
-            piece.mort = True
-        if piece.couleur == 'blanc':
-            self.echiquier.piece_blanc.remove(piece)
-        else:
-            self.echiquier.piece_noir.remove(piece)
-
 class PartiLocal(Parti):
-    def __init__(self):
-        super().__init__()
+    def __init__(self,game):
+        super().__init__(game)
         self.echiquier.preparer_couleur_joue(self.echiquier.couleur_joueur)
 
     def deplacer_piece(self,piece,destination):

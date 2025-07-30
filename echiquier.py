@@ -2,7 +2,7 @@ import piece
 import utilitaire.constante as cst
 import pygame
 import utilitaire.fonction_utile as fct
-from piece import Reine
+from piece import Reine,Pion
 from scene_droite import SceneDroite
 from utilitaire.eventhandler import eventhandler
 from utilitaire.fonction_utile import autre_couleur
@@ -67,8 +67,8 @@ class Echiquier:
 
 
 
-    def generer_piece(self,cla,ind:int,check:bool):
-        if check:
+    def generer_piece(self,cla,ind:int,blanc:bool):
+        if blanc:
             return cla(ind%8,ind//8,'blanc',self)
         else:
             return cla(ind % 8, ind // 8, 'noir', self)
@@ -83,9 +83,9 @@ class Echiquier:
                 elem.calcul_coup(calcul=calcul)
             elif elem.piece == 'roi' and roi_mouv and elem.peut_jouer:
                 elem.calcul_coup(calcul=calcul)
-            l += elem.coup
+            l.extend(elem.coup)
         if calcul and couleur == self.couleur_joueur:
-            self.coup_couleur[couleur] += l
+            self.coup_couleur[couleur].extend(l)
         return l
 
     def preparer_couleur_joue(self,couleur):
@@ -98,7 +98,6 @@ class Echiquier:
         self.calcul_all_coup(couleur)
         if len(self.coup_couleur[couleur]) == 0:
             self.parti.joueur_gagnant = autre_couleur(self.couleur_joueur)
-            print(self.parti.joueur_gagnant)
             eventhandler.activer_event(cst.EVENTMAT)
 
     def creer_coup(self,piec,destination):
@@ -181,6 +180,14 @@ class Echiquier:
         self.deplacer_piece(self.echiquier[x][y],(i1,y),vraiment)
         self.deplacer_piece(self.echiquier[4][y], (i2, y), vraiment)
 
+    def dejouer_rock(self,rock:str):
+        y = 7 if rock.islower() else 0
+        x = 7 if rock[1].lower() == 'd' else 0
+        i1 = 5 if x == 7 else 3
+        i2 = 6 if x == 7 else 2
+        self.deplacer_piece(self.echiquier[i1][y], (x, y))
+        self.deplacer_piece(self.echiquier[i2][y], (5, y))
+
     def jouer_coup(self,coup,vraiment=True):
         self.ep.clear()
         co_piece_bouger, piece_bouger, destination ,piece_manger,met_echec,couleur,rock,ep,promote = coup
@@ -202,4 +209,26 @@ class Echiquier:
         if vraiment :
             self.scene_droite.ajouter_coup(coup)
             self.coup.append(coup)
+
+    def dejouer_coup(self,coup):
+        co_piece_bouger, piece_bouger, destination, piece_manger, met_echec, couleur, rock, ep, promote = coup
+        dic_fr_en = {'p':'p','c':'c','f':'b','d':'q','r':'k','t':'r'}
+        self.ep.clear()
+        if rock is not None :
+            self.dejouer_rock(rock)
+            return
+        x,y = destination
+        self.deplacer_piece(self.echiquier[x][y],co_piece_bouger)
+        if ep :
+            if couleur == 'blanc' :
+                self.echiquier[x][y+1] = Pion(x,y+1,'noir',self)
+            else:
+                self.echiquier[x][y-1] = Pion(x, y - 1, 'blanc', self)
+            return
+        piec = self.generer_piece(self.piece_dic[dic_fr_en[piece_manger[0]]],x+y*8,couleur == 'noir')
+        self.echiquier[x][y] = piec
+
+
+
+
 

@@ -41,6 +41,8 @@ EVENTSCROLLUP = 11
 EVENTSCROLLDOWN = 12
 EVENTMOUSEFINCLICK = 13
 EVENTMAT = 14
+EVENTSAVEGAME = 15
+EVENTKEYPRESS = 16
 
 #plateau
 plateau_classique = 'RCBQKBCR/PPPPPPPP/8/8/8/8/pppppppp/rcbqkbcr'
@@ -51,7 +53,9 @@ timer_noir = 30*60
 
 #taille chose
 TRESPETITEPOLICE = int(width / 48)
+PETITEPETITEPOLICE = int(width / 40)
 PETITEPOLICE = int(width / 32)
+MIDPETITEPOLICE = int(width / 28)
 MOYENNEPOLICE = int(width / 20)
 GRANDEPOLICE = int(width/14)
 TRESGRANDEPOLICE = int(width / 8)
@@ -59,6 +63,8 @@ taille_case = height / 8
 
 #couleur
 COULEURBG = (0,25,200)
+COULEURBGFONCE = (0,25,100)
+BLEUFONCE = (0,25,50)
 COULEURBOUTONACCEUIL = (50,200,0)
 COULEURBOUTONACCEUILHOVER = (50,150,0)
 couleur_case_blanche = (255,255,255)
